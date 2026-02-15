@@ -1,0 +1,2645 @@
+<!doctype html>
+<html lang="en">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discord Webhook Manager</title>
+  <script src="/_sdk/element_sdk.js"></script>
+  <style>
+        /* ============================================
+           CSS Variables & Root Styles
+        ============================================ */
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --bg-glass: rgba(22, 27, 34, 0.8);
+            --text-primary: #f0f6fc;
+            --text-secondary: #8b949e;
+            --text-muted: #6e7681;
+            --accent-primary: #58a6ff;
+            --accent-secondary: #1f6feb;
+            --accent-success: #3fb950;
+            --accent-warning: #d29922;
+            --accent-danger: #f85149;
+            --accent-purple: #a371f7;
+            --border-color: rgba(240, 246, 252, 0.1);
+            --shadow-color: rgba(0, 0, 0, 0.3);
+            --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            --gradient-3: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            --sidebar-width: 280px;
+            --sidebar-collapsed: 70px;
+            --transition-speed: 0.3s;
+            --font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        .light-mode {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f6f8fa;
+            --bg-tertiary: #eaeef2;
+            --bg-glass: rgba(246, 248, 250, 0.9);
+            --text-primary: #1f2328;
+            --text-secondary: #656d76;
+            --text-muted: #8c959f;
+            --border-color: rgba(31, 35, 40, 0.15);
+            --shadow-color: rgba(0, 0, 0, 0.1);
+        }
+
+        /* ============================================
+           Base Styles & Reset
+        ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            width: 100%;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            transition: background var(--transition-speed), color var(--transition-speed);
+        }
+
+        /* ============================================
+           Animated Background
+        ============================================ */
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        .animated-bg::before {
+            content: '';
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            top: -50%;
+            left: -50%;
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(88, 166, 255, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(163, 113, 247, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(63, 185, 80, 0.1) 0%, transparent 50%);
+            animation: bgFloat 20s ease-in-out infinite;
+        }
+
+        @keyframes bgFloat {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(2%, 2%) rotate(1deg); }
+            66% { transform: translate(-1%, 1%) rotate(-1deg); }
+        }
+
+        .light-mode .animated-bg::before {
+            background: 
+                radial-gradient(circle at 20% 80%, rgba(88, 166, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(163, 113, 247, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(63, 185, 80, 0.08) 0%, transparent 50%);
+        }
+
+        /* ============================================
+           Custom Scrollbar
+        ============================================ */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            transition: background var(--transition-speed);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-primary);
+        }
+
+        /* ============================================
+           App Container
+        ============================================ */
+        .app-container {
+            display: flex;
+            height: 100%;
+            width: 100%;
+            opacity: 0;
+            animation: fadeIn 0.6s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; }
+        }
+
+        /* ============================================
+           Sidebar Styles
+        ============================================ */
+        .sidebar {
+            width: var(--sidebar-width);
+            height: 100%;
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            transition: width var(--transition-speed) ease;
+            position: relative;
+            z-index: 100;
+        }
+
+        .sidebar.collapsed {
+            width: var(--sidebar-collapsed);
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-height: 70px;
+        }
+
+        .logo {
+            width: 36px;
+            height: 36px;
+            background: var(--gradient-1);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .logo svg {
+            width: 20px;
+            height: 20px;
+            fill: white;
+        }
+
+        .logo-text {
+            font-size: 16px;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            white-space: nowrap;
+            opacity: 1;
+            transition: opacity var(--transition-speed);
+        }
+
+        .sidebar.collapsed .logo-text {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 16px 12px;
+            overflow-y: auto;
+        }
+
+        .nav-section {
+            margin-bottom: 24px;
+        }
+
+        .nav-section-title {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            padding: 0 12px;
+            margin-bottom: 8px;
+            white-space: nowrap;
+            overflow: hidden;
+            transition: opacity var(--transition-speed);
+        }
+
+        .sidebar.collapsed .nav-section-title {
+            opacity: 0;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 4px;
+        }
+
+        .nav-item:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .nav-item.active {
+            background: rgba(88, 166, 255, 0.15);
+            color: var(--accent-primary);
+        }
+
+        .nav-item.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 60%;
+            background: var(--accent-primary);
+            border-radius: 0 3px 3px 0;
+        }
+
+        .nav-icon {
+            width: 20px;
+            height: 20px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-icon svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        .nav-text {
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            opacity: 1;
+            transition: opacity var(--transition-speed);
+        }
+
+        .sidebar.collapsed .nav-text {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+        }
+
+        /* Ripple Effect */
+        .ripple {
+            position: absolute;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: scale(0);
+            animation: rippleAnim 0.6s linear;
+            pointer-events: none;
+        }
+
+        @keyframes rippleAnim {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
+        /* Sidebar Toggle */
+        .sidebar-toggle {
+            position: absolute;
+            right: -14px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 28px;
+            height: 28px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            z-index: 101;
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--accent-primary);
+            border-color: var(--accent-primary);
+        }
+
+        .sidebar-toggle svg {
+            width: 14px;
+            height: 14px;
+            fill: var(--text-secondary);
+            transition: all var(--transition-speed);
+        }
+
+        .sidebar-toggle:hover svg {
+            fill: white;
+        }
+
+        .sidebar.collapsed .sidebar-toggle svg {
+            transform: rotate(180deg);
+        }
+
+        /* Sidebar Footer */
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .theme-toggle {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .theme-switch {
+            width: 44px;
+            height: 24px;
+            background: var(--bg-tertiary);
+            border-radius: 12px;
+            position: relative;
+            transition: background var(--transition-speed);
+            flex-shrink: 0;
+        }
+
+        .theme-switch::after {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            background: var(--text-primary);
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: all var(--transition-speed);
+        }
+
+        .light-mode .theme-switch {
+            background: var(--accent-primary);
+        }
+
+        .light-mode .theme-switch::after {
+            left: 23px;
+            background: white;
+        }
+
+        .theme-text {
+            font-size: 14px;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: opacity var(--transition-speed);
+        }
+
+        .sidebar.collapsed .theme-text {
+            opacity: 0;
+            width: 0;
+            overflow: hidden;
+        }
+
+        /* ============================================
+           Main Content Area
+        ============================================ */
+        .main-content {
+            flex: 1;
+            height: 100%;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        /* Page Header */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .page-title {
+            font-size: 28px;
+            font-weight: 700;
+            background: var(--gradient-1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .page-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* ============================================
+           Glass Card Component
+        ============================================ */
+        .glass-card {
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 8px 32px var(--shadow-color);
+            transition: all var(--transition-speed);
+            animation: slideUp 0.4s ease forwards;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .glass-card:hover {
+            box-shadow: 0 12px 40px var(--shadow-color);
+        }
+
+        @keyframes slideUp {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-title svg {
+            width: 20px;
+            height: 20px;
+            fill: var(--accent-primary);
+        }
+
+        /* ============================================
+           Button Styles
+        ============================================ */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        .btn-primary {
+            background: var(--gradient-1);
+            color: white;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-secondary);
+            border-color: var(--accent-primary);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #3fb950 0%, #238636 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(63, 185, 80, 0.4);
+        }
+
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(63, 185, 80, 0.5);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #f85149 0%, #da3633 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(248, 81, 73, 0.4);
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(248, 81, 73, 0.5);
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .btn-icon {
+            width: 36px;
+            height: 36px;
+            padding: 0;
+            border-radius: 8px;
+        }
+
+        .btn:active {
+            transform: scale(0.98);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        /* Glow Effect */
+        .glow-effect {
+            position: relative;
+        }
+
+        .glow-effect::before {
+            content: '';
+            position: absolute;
+            inset: -2px;
+            background: var(--gradient-1);
+            border-radius: inherit;
+            opacity: 0;
+            transition: opacity var(--transition-speed);
+            z-index: -1;
+            filter: blur(10px);
+        }
+
+        .glow-effect:hover::before {
+            opacity: 0.6;
+        }
+
+        /* ============================================
+           Form Elements
+        ============================================ */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            font-size: 14px;
+            font-family: inherit;
+            color: var(--text-primary);
+            transition: all var(--transition-speed);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.2);
+        }
+
+        .form-input::placeholder {
+            color: var(--text-muted);
+        }
+
+        textarea.form-input {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .form-input-with-counter {
+            position: relative;
+        }
+
+        .char-counter {
+            position: absolute;
+            right: 12px;
+            bottom: 12px;
+            font-size: 11px;
+            color: var(--text-muted);
+        }
+
+        .char-counter.warning {
+            color: var(--accent-warning);
+        }
+
+        .char-counter.danger {
+            color: var(--accent-danger);
+        }
+
+        /* Select */
+        .form-select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%238b949e' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10l-5 5z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 36px;
+        }
+
+        /* Color Picker */
+        .color-picker-wrapper {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .color-picker {
+            width: 50px;
+            height: 40px;
+            padding: 0;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            overflow: hidden;
+        }
+
+        .color-picker::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        .color-picker::-webkit-color-swatch {
+            border: none;
+            border-radius: 8px;
+        }
+
+        .color-value {
+            flex: 1;
+        }
+
+        /* Toggle Switch */
+        .toggle-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .toggle {
+            width: 48px;
+            height: 26px;
+            background: var(--bg-tertiary);
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: background var(--transition-speed);
+        }
+
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: all var(--transition-speed);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle.active {
+            background: var(--accent-primary);
+        }
+
+        .toggle.active::after {
+            left: 25px;
+        }
+
+        /* ============================================
+           Webhook List
+        ============================================ */
+        .webhook-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .webhook-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            transition: all var(--transition-speed);
+            animation: slideIn 0.3s ease forwards;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .webhook-item:hover {
+            border-color: var(--accent-primary);
+            transform: translateX(4px);
+        }
+
+        .webhook-status {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+        .webhook-status.valid {
+            background: var(--accent-success);
+            box-shadow: 0 0 10px rgba(63, 185, 80, 0.5);
+        }
+
+        .webhook-status.invalid {
+            background: var(--accent-danger);
+            box-shadow: 0 0 10px rgba(248, 81, 73, 0.5);
+        }
+
+        .webhook-status.unknown {
+            background: var(--text-muted);
+        }
+
+        .webhook-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .webhook-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .webhook-name input {
+            background: transparent;
+            border: none;
+            color: inherit;
+            font: inherit;
+            padding: 0;
+            width: 100%;
+        }
+
+        .webhook-name input:focus {
+            outline: none;
+        }
+
+        .webhook-url {
+            font-size: 12px;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-family: 'Consolas', monospace;
+        }
+
+        .webhook-actions {
+            display: flex;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 48px 24px;
+            color: var(--text-muted);
+        }
+
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            fill: var(--text-muted);
+            margin-bottom: 16px;
+            opacity: 0.5;
+        }
+
+        .empty-state h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+            color: var(--text-secondary);
+        }
+
+        /* ============================================
+           Add Webhook Form
+        ============================================ */
+        .add-webhook-form {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .add-webhook-form .form-input {
+            flex: 1;
+        }
+
+        /* ============================================
+           Message Sender Section
+        ============================================ */
+        .message-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 1200px) {
+            .message-section {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* File Upload Area */
+        .file-upload-area {
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+            position: relative;
+        }
+
+        .file-upload-area:hover,
+        .file-upload-area.drag-over {
+            border-color: var(--accent-primary);
+            background: rgba(88, 166, 255, 0.05);
+        }
+
+        .file-upload-area.drag-over {
+            transform: scale(1.02);
+        }
+
+        .file-upload-area svg {
+            width: 48px;
+            height: 48px;
+            fill: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .file-upload-area p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .file-upload-area .highlight {
+            color: var(--accent-primary);
+            font-weight: 600;
+        }
+
+        .file-upload-input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .uploaded-files {
+            margin-top: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .uploaded-file {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .uploaded-file svg {
+            width: 16px;
+            height: 16px;
+            fill: var(--accent-primary);
+        }
+
+        .uploaded-file .remove-file {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+        }
+
+        .uploaded-file .remove-file:hover {
+            background: var(--accent-danger);
+        }
+
+        .uploaded-file .remove-file svg {
+            width: 10px;
+            height: 10px;
+            fill: var(--text-secondary);
+        }
+
+        .uploaded-file .remove-file:hover svg {
+            fill: white;
+        }
+
+        /* ============================================
+           Embed Builder
+        ============================================ */
+        .embed-builder {
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            background: var(--bg-secondary);
+        }
+
+        .embed-builder-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .embed-builder-title {
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .embed-builder-title svg {
+            width: 16px;
+            height: 16px;
+            fill: var(--accent-purple);
+        }
+
+        .embed-fields {
+            display: grid;
+            gap: 16px;
+        }
+
+        /* Embed Preview */
+        .embed-preview {
+            margin-top: 24px;
+            padding: 16px;
+            background: var(--bg-primary);
+            border-radius: 12px;
+            border-left: 4px solid var(--accent-primary);
+        }
+
+        .embed-preview-title {
+            font-weight: 700;
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: var(--accent-primary);
+        }
+
+        .embed-preview-description {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .embed-preview-footer {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+            font-size: 12px;
+            color: var(--text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* ============================================
+           Message Log / History
+        ============================================ */
+        .message-log {
+            max-height: 300px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .log-entry {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            font-size: 13px;
+            animation: fadeSlide 0.3s ease forwards;
+        }
+
+        @keyframes fadeSlide {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .log-status {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-top: 5px;
+            flex-shrink: 0;
+        }
+
+        .log-status.success {
+            background: var(--accent-success);
+        }
+
+        .log-status.error {
+            background: var(--accent-danger);
+        }
+
+        .log-status.warning {
+            background: var(--accent-warning);
+        }
+
+        .log-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .log-message {
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+
+        .log-time {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .log-webhook {
+            font-size: 11px;
+            color: var(--accent-primary);
+        }
+
+        /* ============================================
+           Toast Notifications
+        ============================================ */
+        .toast-container {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            pointer-events: none;
+        }
+
+        .toast {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px 20px;
+            background: var(--bg-glass);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            box-shadow: 0 8px 32px var(--shadow-color);
+            pointer-events: auto;
+            animation: toastIn 0.4s ease forwards;
+            min-width: 300px;
+            max-width: 400px;
+        }
+
+        @keyframes toastIn {
+            from {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .toast.removing {
+            animation: toastOut 0.3s ease forwards;
+        }
+
+        @keyframes toastOut {
+            to {
+                opacity: 0;
+                transform: translateX(100px);
+            }
+        }
+
+        .toast-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .toast-icon svg {
+            width: 14px;
+            height: 14px;
+            fill: white;
+        }
+
+        .toast.success .toast-icon {
+            background: var(--accent-success);
+        }
+
+        .toast.error .toast-icon {
+            background: var(--accent-danger);
+        }
+
+        .toast.warning .toast-icon {
+            background: var(--accent-warning);
+        }
+
+        .toast.info .toast-icon {
+            background: var(--accent-primary);
+        }
+
+        .toast-content {
+            flex: 1;
+        }
+
+        .toast-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .toast-message {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .toast-close {
+            width: 24px;
+            height: 24px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: background var(--transition-speed);
+        }
+
+        .toast-close:hover {
+            background: var(--bg-tertiary);
+        }
+
+        .toast-close svg {
+            width: 12px;
+            height: 12px;
+            fill: var(--text-muted);
+        }
+
+        /* ============================================
+           Modal
+        ============================================ */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-speed);
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            transform: scale(0.9);
+            transition: transform var(--transition-speed);
+        }
+
+        .modal-overlay.active .modal {
+            transform: scale(1);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .modal-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-icon.danger {
+            background: rgba(248, 81, 73, 0.15);
+        }
+
+        .modal-icon svg {
+            width: 24px;
+            height: 24px;
+        }
+
+        .modal-icon.danger svg {
+            fill: var(--accent-danger);
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .modal-body {
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* ============================================
+           Loading Spinner
+        ============================================ */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(13, 17, 23, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: inherit;
+            opacity: 0;
+            visibility: hidden;
+            transition: all var(--transition-speed);
+        }
+
+        .loading-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .loading-content {
+            text-align: center;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 12px;
+        }
+
+        .loading-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* ============================================
+           Quick Actions
+        ============================================ */
+        .quick-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .quick-action {
+            padding: 6px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all var(--transition-speed);
+        }
+
+        .quick-action:hover {
+            border-color: var(--accent-primary);
+            color: var(--accent-primary);
+        }
+
+        /* ============================================
+           Page Views
+        ============================================ */
+        .page-view {
+            display: none;
+            animation: pageFade 0.3s ease;
+        }
+
+        .page-view.active {
+            display: block;
+        }
+
+        @keyframes pageFade {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ============================================
+           Import/Export Buttons
+        ============================================ */
+        .import-export-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+        }
+
+        .hidden-input {
+            display: none;
+        }
+
+        /* ============================================
+           Keyboard Shortcut Hint
+        ============================================ */
+        .shortcut-hint {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-left: 8px;
+        }
+
+        .kbd {
+            padding: 2px 6px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            font-size: 10px;
+        }
+
+        /* ============================================
+           Responsive Design
+        ============================================ */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                height: 100%;
+                transform: translateX(-100%);
+                z-index: 1000;
+            }
+
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+
+            .sidebar-toggle {
+                display: none;
+            }
+
+            .mobile-menu-btn {
+                display: flex;
+            }
+
+            .main-content {
+                padding: 16px;
+            }
+
+            .add-webhook-form {
+                flex-direction: column;
+            }
+
+            .webhook-item {
+                flex-wrap: wrap;
+            }
+
+            .webhook-actions {
+                width: 100%;
+                justify-content: flex-end;
+                margin-top: 8px;
+                padding-top: 8px;
+                border-top: 1px solid var(--border-color);
+            }
+        }
+
+        .mobile-menu-btn {
+            display: none;
+            width: 40px;
+            height: 40px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+
+        .mobile-menu-btn svg {
+            width: 20px;
+            height: 20px;
+            fill: var(--text-primary);
+        }
+
+        @media (max-width: 768px) {
+            .mobile-menu-btn {
+                display: flex;
+            }
+        }
+
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+        }
+
+        .mobile-overlay.active {
+            display: block;
+        }
+
+        /* ============================================
+           Webhook Select Dropdown
+        ============================================ */
+        .webhook-select-wrapper {
+            margin-bottom: 20px;
+        }
+
+        .webhook-select-wrapper .form-select {
+            padding-right: 40px;
+        }
+
+        .no-webhooks-warning {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: rgba(210, 153, 34, 0.1);
+            border: 1px solid rgba(210, 153, 34, 0.3);
+            border-radius: 10px;
+            color: var(--accent-warning);
+            font-size: 14px;
+        }
+
+        .no-webhooks-warning svg {
+            width: 20px;
+            height: 20px;
+            fill: currentColor;
+            flex-shrink: 0;
+        }
+    </style>
+  <style>body { box-sizing: border-box; }</style>
+  <script src="https://cdn.tailwindcss.com/3.4.17" type="text/javascript"></script>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body><!-- Animated Background -->
+  <div class="animated-bg"></div><!-- Toast Container -->
+  <div class="toast-container" id="toastContainer"></div><!-- Delete Confirmation Modal -->
+  <div class="modal-overlay" id="deleteModal">
+   <div class="modal">
+    <div class="modal-header">
+     <div class="modal-icon danger">
+      <svg viewbox="0 0 24 24">
+       <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
+      </svg>
+     </div>
+     <h3 class="modal-title">Delete Webhook</h3>
+    </div>
+    <div class="modal-body">
+     Are you sure you want to delete this webhook? This action cannot be undone.
+    </div>
+    <div class="modal-footer"><button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button> <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+    </div>
+   </div>
+  </div><!-- Mobile Overlay -->
+  <div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileMenu()"></div><!-- Main App Container -->
+  <div class="app-container"><!-- Sidebar -->
+   <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+     <div class="logo">
+      <svg viewbox="0 0 24 24">
+       <path d="M19.27 5.33C17.94 4.71 16.5 4.26 15 4a.09.09 0 0 0-.07.03c-.18.33-.39.76-.53 1.09a16.09 16.09 0 0 0-4.8 0c-.14-.34-.35-.76-.54-1.09c-.01-.02-.04-.03-.07-.03c-1.5.26-2.93.71-4.27 1.33c-.01 0-.02.01-.03.02c-2.72 4.07-3.47 8.03-3.1 11.95c0 .02.01.04.03.05c1.8 1.32 3.53 2.12 5.24 2.65c.03.01.06 0 .07-.02c.4-.55.76-1.13 1.07-1.74c.02-.04 0-.08-.04-.09c-.57-.22-1.11-.48-1.64-.78c-.04-.02-.04-.08-.01-.11c.11-.08.22-.17.33-.25c.02-.02.05-.02.07-.01c3.44 1.57 7.15 1.57 10.55 0c.02-.01.05-.01.07.01c.11.09.22.17.33.26c.04.03.04.09-.01.11c-.52.31-1.07.56-1.64.78c-.04.01-.05.06-.04.09c.32.61.68 1.19 1.07 1.74c.03.01.06.02.09.01c1.72-.53 3.45-1.33 5.25-2.65c.02-.01.03-.03.03-.05c.44-4.53-.73-8.46-3.1-11.95c-.01-.01-.02-.02-.04-.02zM8.52 14.91c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.84 2.12-1.89 2.12zm6.97 0c-1.03 0-1.89-.95-1.89-2.12s.84-2.12 1.89-2.12c1.06 0 1.9.96 1.89 2.12c0 1.17-.83 2.12-1.89 2.12z" />
+      </svg>
+     </div><span class="logo-text" id="appTitle">Webhook Manager</span>
+    </div>
+    <div class="sidebar-toggle" onclick="toggleSidebar()">
+     <svg viewbox="0 0 24 24">
+      <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z" />
+     </svg>
+    </div>
+    <nav class="sidebar-nav">
+     <div class="nav-section">
+      <div class="nav-section-title">
+       Main Menu
+      </div>
+      <div class="nav-item active" data-page="webhooks" onclick="navigateTo('webhooks', this)">
+       <div class="nav-icon">
+        <svg viewbox="0 0 24 24">
+         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+        </svg>
+       </div><span class="nav-text">Webhooks</span>
+      </div>
+      <div class="nav-item" data-page="sender" onclick="navigateTo('sender', this)">
+       <div class="nav-icon">
+        <svg viewbox="0 0 24 24">
+         <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+        </svg>
+       </div><span class="nav-text">Send Message</span>
+      </div>
+      <div class="nav-item" data-page="history" onclick="navigateTo('history', this)">
+       <div class="nav-icon">
+        <svg viewbox="0 0 24 24">
+         <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" />
+        </svg>
+       </div><span class="nav-text">History</span>
+      </div>
+     </div>
+    </nav>
+    <div class="sidebar-footer">
+     <div class="theme-toggle" onclick="toggleTheme()">
+      <div class="theme-switch" id="themeSwitch"></div><span class="theme-text">Dark Mode</span>
+     </div>
+    </div>
+   </aside><!-- Main Content -->
+   <main class="main-content"><!-- Page Header -->
+    <header class="page-header">
+     <div><button class="mobile-menu-btn" onclick="openMobileMenu()">
+       <svg viewbox="0 0 24 24">
+        <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z" />
+       </svg></button>
+      <h1 class="page-title" id="pageTitle">Webhook Manager</h1>
+      <p class="page-subtitle" id="pageSubtitle">Manage your Discord webhooks</p>
+     </div>
+    </header><!-- Webhooks Page -->
+    <div class="page-view active" id="webhooksPage">
+     <div class="glass-card" style="animation-delay: 0.1s;">
+      <div class="card-header">
+       <h2 class="card-title">
+        <svg viewbox="0 0 24 24">
+         <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+        </svg> Add Webhook</h2>
+      </div>
+      <form class="add-webhook-form" onsubmit="addWebhook(event)"><input type="text" class="form-input" id="webhookName" placeholder="Webhook Name" required> <input type="url" class="form-input" id="webhookUrl" placeholder="https://discord.com/api/webhooks/..." required> <button type="submit" class="btn btn-primary glow-effect">
+        <svg viewbox="0 0 24 24">
+         <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+        </svg> Add </button>
+      </form>
+     </div>
+     <div class="glass-card" style="animation-delay: 0.2s;">
+      <div class="card-header">
+       <h2 class="card-title">
+        <svg viewbox="0 0 24 24">
+         <path d="M3 13h2v-2H3v2zm0 4h2v-2H3v2zm0-8h2V7H3v2zm4 4h14v-2H7v2zm0 4h14v-2H7v2zM7 7v2h14V7H7z" />
+        </svg> Your Webhooks</h2><span id="webhookCount" class="text-secondary" style="font-size: 14px; color: var(--text-muted);">0 webhooks</span>
+      </div>
+      <div class="webhook-list" id="webhookList">
+       <div class="empty-state">
+        <svg viewbox="0 0 24 24">
+         <path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-4.86 8.86l-3 3.87L9 13.14 6 17h12l-3.86-5.14z" />
+        </svg>
+        <h3>No Webhooks Yet</h3>
+        <p>Add your first Discord webhook to get started</p>
+       </div>
+      </div>
+      <div class="import-export-actions"><input type="file" id="importInput" class="hidden-input" accept=".json" onchange="importWebhooks(event)"> <button class="btn btn-secondary" onclick="document.getElementById('importInput').click()">
+        <svg viewbox="0 0 24 24">
+         <path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z" />
+        </svg> Import </button> <button class="btn btn-secondary" onclick="exportWebhooks()">
+        <svg viewbox="0 0 24 24">
+         <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+        </svg> Export </button>
+      </div>
+     </div>
+    </div><!-- Sender Page -->
+    <div class="page-view" id="senderPage">
+     <div class="message-section"><!-- Message Form -->
+      <div class="glass-card" style="animation-delay: 0.1s; position: relative;">
+       <div class="loading-overlay" id="sendingLoader">
+        <div class="loading-content">
+         <div class="loading-spinner"></div>
+         <div class="loading-text">
+          Sending message...
+         </div>
+        </div>
+       </div>
+       <div class="card-header">
+        <h2 class="card-title">
+         <svg viewbox="0 0 24 24">
+          <path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z" />
+         </svg> Compose Message</h2>
+       </div><!-- Webhook Select -->
+       <div class="webhook-select-wrapper"><label class="form-label" for="selectedWebhook">Select Webhook</label> <select class="form-input form-select" id="selectedWebhook"> <option value="">Choose a webhook...</option> </select>
+       </div>
+       <div id="noWebhookWarning" class="no-webhooks-warning" style="display: none;">
+        <svg viewbox="0 0 24 24">
+         <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+        </svg><span>No webhooks configured. Please add a webhook first.</span>
+       </div><!-- Quick Mentions -->
+       <div class="quick-actions"><span class="quick-action" onclick="insertMention('@everyone')">@everyone</span> <span class="quick-action" onclick="insertMention('@here')">@here</span>
+       </div><!-- Message Content -->
+       <div class="form-group"><label class="form-label" for="messageContent">Message Content</label>
+        <div class="form-input-with-counter"><textarea class="form-input" id="messageContent" placeholder="Write your message here..." oninput="updateCharCounter()"></textarea> <span class="char-counter" id="charCounter">0 / 2000</span>
+        </div>
+       </div><!-- File Upload -->
+       <div class="form-group"><label class="form-label">Attachments</label>
+        <div class="file-upload-area" id="fileUploadArea"><input type="file" class="file-upload-input" id="fileInput" multiple onchange="handleFileSelect(event)">
+         <svg viewbox="0 0 24 24">
+          <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z" />
+         </svg>
+         <p>Drag &amp; drop files here or <span class="highlight">browse</span></p>
+        </div>
+        <div class="uploaded-files" id="uploadedFiles"></div>
+       </div><!-- Embed Toggle -->
+       <div class="form-group">
+        <div class="toggle-wrapper">
+         <div class="toggle" id="embedToggle" onclick="toggleEmbed()"></div><span>Enable Embed</span>
+        </div>
+       </div><!-- Embed Builder -->
+       <div class="embed-builder" id="embedBuilder" style="display: none;">
+        <div class="embed-builder-header"><span class="embed-builder-title">
+          <svg viewbox="0 0 24 24">
+           <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z" />
+          </svg> Embed Builder </span>
+        </div>
+        <div class="embed-fields">
+         <div class="form-group"><label class="form-label">Title</label> <input type="text" class="form-input" id="embedTitle" placeholder="Embed title" oninput="updateEmbedPreview()">
+         </div>
+         <div class="form-group"><label class="form-label">Description</label> <textarea class="form-input" id="embedDescription" placeholder="Embed description" rows="3" oninput="updateEmbedPreview()"></textarea>
+         </div>
+         <div class="form-group"><label class="form-label">Color</label>
+          <div class="color-picker-wrapper"><input type="color" class="color-picker" id="embedColor" value="#5865F2" oninput="updateEmbedPreview()"> <input type="text" class="form-input color-value" id="embedColorValue" value="#5865F2" oninput="syncColorPicker()">
+          </div>
+         </div>
+         <div class="form-group"><label class="form-label">Footer</label> <input type="text" class="form-input" id="embedFooter" placeholder="Footer text" oninput="updateEmbedPreview()">
+         </div>
+         <div class="form-group">
+          <div class="toggle-wrapper">
+           <div class="toggle" id="timestampToggle" onclick="toggleTimestamp()"></div><span>Include Timestamp</span>
+          </div>
+         </div>
+        </div>
+       </div><!-- Action Buttons -->
+       <div style="display: flex; gap: 12px; margin-top: 24px;"><button class="btn btn-primary glow-effect" onclick="sendMessage()" style="flex: 1;">
+         <svg viewbox="0 0 24 24">
+          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+         </svg> Send Message <span class="shortcut-hint"><span class="kbd">Ctrl</span>+<span class="kbd">Enter</span></span> </button> <button class="btn btn-secondary" onclick="clearForm()">
+         <svg viewbox="0 0 24 24">
+          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+         </svg> Clear </button>
+       </div>
+      </div><!-- Embed Preview -->
+      <div class="glass-card" id="embedPreviewCard" style="animation-delay: 0.2s; display: none;">
+       <div class="card-header">
+        <h2 class="card-title">
+         <svg viewbox="0 0 24 24">
+          <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+         </svg> Embed Preview</h2>
+       </div>
+       <div class="embed-preview" id="embedPreview">
+        <div class="embed-preview-title" id="previewTitle">
+         Title will appear here
+        </div>
+        <div class="embed-preview-description" id="previewDescription">
+         Description will appear here
+        </div>
+        <div class="embed-preview-footer"><span id="previewFooter">Footer</span> <span id="previewTimestamp"></span>
+        </div>
+       </div>
+      </div>
+     </div>
+    </div><!-- History Page -->
+    <div class="page-view" id="historyPage">
+     <div class="glass-card" style="animation-delay: 0.1s;">
+      <div class="card-header">
+       <h2 class="card-title">
+        <svg viewbox="0 0 24 24">
+         <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" />
+        </svg> Message History</h2><button class="btn btn-secondary btn-small" onclick="clearHistory()">
+        <svg viewbox="0 0 24 24">
+         <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" />
+        </svg> Clear </button>
+      </div>
+      <div class="message-log" id="messageLog">
+       <div class="empty-state">
+        <svg viewbox="0 0 24 24">
+         <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z" />
+        </svg>
+        <h3>No History Yet</h3>
+        <p>Your sent messages will appear here</p>
+       </div>
+      </div>
+     </div>
+    </div>
+   </main>
+  </div>
+  <script>
+        /* ============================================
+           Application State
+        ============================================ */
+        const AppState = {
+            webhooks: [],
+            messageHistory: [],
+            uploadedFiles: [],
+            embedEnabled: false,
+            timestampEnabled: false,
+            darkMode: true,
+            sidebarCollapsed: false,
+            currentPage: 'webhooks',
+            webhookToDelete: null
+        };
+
+        /* ============================================
+           DOM References
+        ============================================ */
+        const DOM = {
+            sidebar: document.getElementById('sidebar'),
+            webhookList: document.getElementById('webhookList'),
+            webhookCount: document.getElementById('webhookCount'),
+            selectedWebhook: document.getElementById('selectedWebhook'),
+            messageContent: document.getElementById('messageContent'),
+            charCounter: document.getElementById('charCounter'),
+            embedBuilder: document.getElementById('embedBuilder'),
+            embedPreviewCard: document.getElementById('embedPreviewCard'),
+            embedToggle: document.getElementById('embedToggle'),
+            timestampToggle: document.getElementById('timestampToggle'),
+            themeSwitch: document.getElementById('themeSwitch'),
+            toastContainer: document.getElementById('toastContainer'),
+            messageLog: document.getElementById('messageLog'),
+            deleteModal: document.getElementById('deleteModal'),
+            sendingLoader: document.getElementById('sendingLoader'),
+            fileUploadArea: document.getElementById('fileUploadArea'),
+            uploadedFiles: document.getElementById('uploadedFiles'),
+            noWebhookWarning: document.getElementById('noWebhookWarning'),
+            mobileOverlay: document.getElementById('mobileOverlay')
+        };
+
+        /* ============================================
+           Initialization
+        ============================================ */
+        function init() {
+            loadFromStorage();
+            renderWebhookList();
+            renderMessageHistory();
+            updateWebhookSelect();
+            setupEventListeners();
+            initElementSdk();
+        }
+
+        function initElementSdk() {
+            const defaultConfig = {
+                app_title: 'Webhook Manager'
+            };
+
+            if (window.elementSdk) {
+                window.elementSdk.init({
+                    defaultConfig,
+                    onConfigChange: async (config) => {
+                        const title = config.app_title || defaultConfig.app_title;
+                        document.getElementById('appTitle').textContent = title;
+                    },
+                    mapToCapabilities: (config) => ({
+                        recolorables: [],
+                        borderables: [],
+                        fontEditable: undefined,
+                        fontSizeable: undefined
+                    }),
+                    mapToEditPanelValues: (config) => new Map([
+                        ['app_title', config.app_title || defaultConfig.app_title]
+                    ])
+                });
+            }
+        }
+
+        function setupEventListeners() {
+            // Keyboard shortcut: Ctrl+Enter to send
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 'Enter') {
+                    if (AppState.currentPage === 'sender') {
+                        sendMessage();
+                    }
+                }
+            });
+
+            // Drag and drop for file upload
+            const fileArea = DOM.fileUploadArea;
+            
+            fileArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fileArea.classList.add('drag-over');
+            });
+
+            fileArea.addEventListener('dragleave', () => {
+                fileArea.classList.remove('drag-over');
+            });
+
+            fileArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileArea.classList.remove('drag-over');
+                const files = Array.from(e.dataTransfer.files);
+                files.forEach(file => addFile(file));
+            });
+
+            // Ripple effect on nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.addEventListener('click', createRipple);
+            });
+        }
+
+        /* ============================================
+           Storage Functions
+        ============================================ */
+        function loadFromStorage() {
+            try {
+                const webhooks = localStorage.getItem('discord_webhooks');
+                const history = localStorage.getItem('discord_message_history');
+                const theme = localStorage.getItem('discord_theme');
+
+                if (webhooks) AppState.webhooks = JSON.parse(webhooks);
+                if (history) AppState.messageHistory = JSON.parse(history);
+                if (theme === 'light') {
+                    AppState.darkMode = false;
+                    document.body.classList.add('light-mode');
+                }
+            } catch (e) {
+                console.error('Error loading from storage:', e);
+            }
+        }
+
+        function saveWebhooks() {
+            localStorage.setItem('discord_webhooks', JSON.stringify(AppState.webhooks));
+        }
+
+        function saveHistory() {
+            localStorage.setItem('discord_message_history', JSON.stringify(AppState.messageHistory));
+        }
+
+        function saveTheme() {
+            localStorage.setItem('discord_theme', AppState.darkMode ? 'dark' : 'light');
+        }
+
+        /* ============================================
+           Webhook Management
+        ============================================ */
+        function addWebhook(event) {
+            event.preventDefault();
+            
+            const nameInput = document.getElementById('webhookName');
+            const urlInput = document.getElementById('webhookUrl');
+            
+            const name = nameInput.value.trim();
+            const url = urlInput.value.trim();
+
+            if (!isValidWebhookUrl(url)) {
+                showToast('error', 'Invalid URL', 'Please enter a valid Discord webhook URL');
+                return;
+            }
+
+            const webhook = {
+                id: Date.now().toString(),
+                name,
+                url,
+                status: 'unknown',
+                createdAt: new Date().toISOString()
+            };
+
+            AppState.webhooks.push(webhook);
+            saveWebhooks();
+            renderWebhookList();
+            updateWebhookSelect();
+
+            nameInput.value = '';
+            urlInput.value = '';
+
+            showToast('success', 'Webhook Added', `"${name}" has been added successfully`);
+            
+            // Test the webhook
+            testWebhook(webhook.id);
+        }
+
+        function isValidWebhookUrl(url) {
+            return url.startsWith('https://discord.com/api/webhooks/') || 
+                   url.startsWith('https://discordapp.com/api/webhooks/');
+        }
+
+        async function testWebhook(id) {
+            const webhook = AppState.webhooks.find(w => w.id === id);
+            if (!webhook) return;
+
+            try {
+                const response = await fetch(webhook.url);
+                webhook.status = response.ok ? 'valid' : 'invalid';
+            } catch {
+                webhook.status = 'invalid';
+            }
+
+            saveWebhooks();
+            renderWebhookList();
+            updateWebhookSelect();
+        }
+
+        function editWebhookName(id, newName) {
+            const webhook = AppState.webhooks.find(w => w.id === id);
+            if (webhook) {
+                webhook.name = newName;
+                saveWebhooks();
+            }
+        }
+
+        function copyWebhookUrl(id) {
+            const webhook = AppState.webhooks.find(w => w.id === id);
+            if (webhook) {
+                navigator.clipboard.writeText(webhook.url).then(() => {
+                    showToast('success', 'Copied', 'Webhook URL copied to clipboard');
+                });
+            }
+        }
+
+        function openDeleteModal(id) {
+            AppState.webhookToDelete = id;
+            DOM.deleteModal.classList.add('active');
+        }
+
+        function closeDeleteModal() {
+            AppState.webhookToDelete = null;
+            DOM.deleteModal.classList.remove('active');
+        }
+
+        function confirmDelete() {
+            if (AppState.webhookToDelete) {
+                const webhook = AppState.webhooks.find(w => w.id === AppState.webhookToDelete);
+                AppState.webhooks = AppState.webhooks.filter(w => w.id !== AppState.webhookToDelete);
+                saveWebhooks();
+                renderWebhookList();
+                updateWebhookSelect();
+                showToast('success', 'Deleted', `"${webhook?.name}" has been removed`);
+            }
+            closeDeleteModal();
+        }
+
+        function exportWebhooks() {
+            if (AppState.webhooks.length === 0) {
+                showToast('warning', 'No Webhooks', 'There are no webhooks to export');
+                return;
+            }
+
+            const data = JSON.stringify(AppState.webhooks, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `discord-webhooks-${Date.now()}.json`;
+            a.click();
+            
+            URL.revokeObjectURL(url);
+            showToast('success', 'Exported', 'Webhooks exported successfully');
+        }
+
+        function importWebhooks(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (Array.isArray(imported)) {
+                        let count = 0;
+                        imported.forEach(webhook => {
+                            if (webhook.name && webhook.url && isValidWebhookUrl(webhook.url)) {
+                                webhook.id = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+                                webhook.status = 'unknown';
+                                AppState.webhooks.push(webhook);
+                                count++;
+                            }
+                        });
+                        saveWebhooks();
+                        renderWebhookList();
+                        updateWebhookSelect();
+                        showToast('success', 'Imported', `${count} webhook(s) imported successfully`);
+                    }
+                } catch {
+                    showToast('error', 'Import Failed', 'Invalid JSON file');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function renderWebhookList() {
+            const container = DOM.webhookList;
+            DOM.webhookCount.textContent = `${AppState.webhooks.length} webhook${AppState.webhooks.length !== 1 ? 's' : ''}`;
+
+            if (AppState.webhooks.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24"><path d="M19 5v14H5V5h14m0-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-4.86 8.86l-3 3.87L9 13.14 6 17h12l-3.86-5.14z"/></svg>
+                        <h3>No Webhooks Yet</h3>
+                        <p>Add your first Discord webhook to get started</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = AppState.webhooks.map((webhook, index) => `
+                <div class="webhook-item" style="animation-delay: ${index * 0.05}s;">
+                    <div class="webhook-status ${webhook.status}"></div>
+                    <div class="webhook-info">
+                        <div class="webhook-name">
+                            <input type="text" value="${escapeHtml(webhook.name)}" 
+                                   onblur="editWebhookName('${webhook.id}', this.value)"
+                                   onkeydown="if(event.key==='Enter')this.blur()">
+                        </div>
+                        <div class="webhook-url">${escapeHtml(webhook.url)}</div>
+                    </div>
+                    <div class="webhook-actions">
+                        <button class="btn btn-secondary btn-icon" onclick="testWebhook('${webhook.id}')" title="Test">
+                            <svg viewBox="0 0 24 24"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46C19.54 15.03 20 13.57 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74C4.46 8.97 4 10.43 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>
+                        </button>
+                        <button class="btn btn-secondary btn-icon" onclick="copyWebhookUrl('${webhook.id}')" title="Copy URL">
+                            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+                        </button>
+                        <button class="btn btn-danger btn-icon" onclick="openDeleteModal('${webhook.id}')" title="Delete">
+                            <svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateWebhookSelect() {
+            const select = DOM.selectedWebhook;
+            const warning = DOM.noWebhookWarning;
+
+            if (AppState.webhooks.length === 0) {
+                select.innerHTML = '<option value="">No webhooks available</option>';
+                select.disabled = true;
+                warning.style.display = 'flex';
+            } else {
+                select.disabled = false;
+                warning.style.display = 'none';
+                select.innerHTML = '<option value="">Choose a webhook...</option>' +
+                    AppState.webhooks.map(w => `
+                        <option value="${w.id}">${escapeHtml(w.name)} ${w.status === 'valid' ? '✓' : w.status === 'invalid' ? '✗' : ''}</option>
+                    `).join('');
+            }
+        }
+
+        /* ============================================
+           Message Sending
+        ============================================ */
+        async function sendMessage() {
+            const webhookId = DOM.selectedWebhook.value;
+            const content = DOM.messageContent.value.trim();
+
+            if (!webhookId) {
+                showToast('error', 'No Webhook', 'Please select a webhook first');
+                return;
+            }
+
+            const webhook = AppState.webhooks.find(w => w.id === webhookId);
+            if (!webhook) return;
+
+            if (!content && !AppState.embedEnabled && AppState.uploadedFiles.length === 0) {
+                showToast('error', 'Empty Message', 'Please enter a message, add an embed, or attach a file');
+                return;
+            }
+
+            // Show loading
+            DOM.sendingLoader.classList.add('active');
+
+            // Build payload
+            const payload = {};
+            
+            if (content) {
+                payload.content = content;
+            }
+
+            if (AppState.embedEnabled) {
+                const embed = buildEmbed();
+                if (embed) {
+                    payload.embeds = [embed];
+                }
+            }
+
+            try {
+                let response;
+                
+                if (AppState.uploadedFiles.length > 0) {
+                    // Send with files
+                    const formData = new FormData();
+                    formData.append('payload_json', JSON.stringify(payload));
+                    
+                    AppState.uploadedFiles.forEach((file, index) => {
+                        formData.append(`file${index}`, file);
+                    });
+
+                    response = await fetch(webhook.url, {
+                        method: 'POST',
+                        body: formData
+                    });
+                } else {
+                    // Send JSON only
+                    response = await fetch(webhook.url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                }
+
+                DOM.sendingLoader.classList.remove('active');
+
+                if (response.status === 204 || response.ok) {
+                    addToHistory('success', content || '[Embed/File]', webhook.name);
+                    showToast('success', 'Message Sent', 'Your message was delivered successfully');
+                    clearForm();
+                } else if (response.status === 429) {
+                    const data = await response.json();
+                    const retryAfter = data.retry_after || 5;
+                    addToHistory('warning', content || '[Embed/File]', webhook.name, `Rate limited. Retry after ${retryAfter}s`);
+                    showToast('warning', 'Rate Limited', `Please wait ${Math.ceil(retryAfter)} seconds before sending again`);
+                } else {
+                    const errorText = await response.text();
+                    addToHistory('error', content || '[Embed/File]', webhook.name, errorText);
+                    showToast('error', 'Send Failed', `Error ${response.status}: ${response.statusText}`);
+                }
+            } catch (error) {
+                DOM.sendingLoader.classList.remove('active');
+                addToHistory('error', content || '[Embed/File]', webhook.name, error.message);
+                showToast('error', 'Network Error', 'Failed to connect to Discord');
+            }
+        }
+
+        function buildEmbed() {
+            const title = document.getElementById('embedTitle').value.trim();
+            const description = document.getElementById('embedDescription').value.trim();
+            const color = document.getElementById('embedColor').value;
+            const footer = document.getElementById('embedFooter').value.trim();
+
+            if (!title && !description) return null;
+
+            const embed = {};
+            
+            if (title) embed.title = title;
+            if (description) embed.description = description;
+            
+            // Convert hex color to integer
+            embed.color = parseInt(color.replace('#', ''), 16);
+            
+            if (footer || AppState.timestampEnabled) {
+                embed.footer = {};
+                if (footer) embed.footer.text = footer;
+            }
+            
+            if (AppState.timestampEnabled) {
+                embed.timestamp = new Date().toISOString();
+            }
+
+            return embed;
+        }
+
+        function insertMention(mention) {
+            const textarea = DOM.messageContent;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const text = textarea.value;
+            
+            textarea.value = text.substring(0, start) + mention + ' ' + text.substring(end);
+            textarea.selectionStart = textarea.selectionEnd = start + mention.length + 1;
+            textarea.focus();
+            updateCharCounter();
+        }
+
+        function updateCharCounter() {
+            const length = DOM.messageContent.value.length;
+            const counter = DOM.charCounter;
+            
+            counter.textContent = `${length} / 2000`;
+            counter.classList.remove('warning', 'danger');
+            
+            if (length > 1900) {
+                counter.classList.add('danger');
+            } else if (length > 1500) {
+                counter.classList.add('warning');
+            }
+        }
+
+        function clearForm() {
+            DOM.messageContent.value = '';
+            document.getElementById('embedTitle').value = '';
+            document.getElementById('embedDescription').value = '';
+            document.getElementById('embedFooter').value = '';
+            document.getElementById('embedColor').value = '#5865F2';
+            document.getElementById('embedColorValue').value = '#5865F2';
+            AppState.uploadedFiles = [];
+            renderUploadedFiles();
+            updateCharCounter();
+            updateEmbedPreview();
+        }
+
+        /* ============================================
+           File Upload
+        ============================================ */
+        function handleFileSelect(event) {
+            const files = Array.from(event.target.files);
+            files.forEach(file => addFile(file));
+            event.target.value = '';
+        }
+
+        function addFile(file) {
+            // Check file size (Discord limit: 8MB for free, 50MB for Nitro)
+            const maxSize = 8 * 1024 * 1024; // 8MB
+            if (file.size > maxSize) {
+                showToast('error', 'File Too Large', `${file.name} exceeds the 8MB limit`);
+                return;
+            }
+
+            // Limit to 10 files
+            if (AppState.uploadedFiles.length >= 10) {
+                showToast('warning', 'File Limit', 'Maximum 10 files allowed');
+                return;
+            }
+
+            AppState.uploadedFiles.push(file);
+            renderUploadedFiles();
+        }
+
+        function removeFile(index) {
+            AppState.uploadedFiles.splice(index, 1);
+            renderUploadedFiles();
+        }
+
+        function renderUploadedFiles() {
+            const container = DOM.uploadedFiles;
+            
+            if (AppState.uploadedFiles.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = AppState.uploadedFiles.map((file, index) => `
+                <div class="uploaded-file">
+                    <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg>
+                    <span>${escapeHtml(file.name)}</span>
+                    <span class="remove-file" onclick="removeFile(${index})">
+                        <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                    </span>
+                </div>
+            `).join('');
+        }
+
+        /* ============================================
+           Embed Functions
+        ============================================ */
+        function toggleEmbed() {
+            AppState.embedEnabled = !AppState.embedEnabled;
+            DOM.embedToggle.classList.toggle('active', AppState.embedEnabled);
+            DOM.embedBuilder.style.display = AppState.embedEnabled ? 'block' : 'none';
+            DOM.embedPreviewCard.style.display = AppState.embedEnabled ? 'block' : 'none';
+            updateEmbedPreview();
+        }
+
+        function toggleTimestamp() {
+            AppState.timestampEnabled = !AppState.timestampEnabled;
+            DOM.timestampToggle.classList.toggle('active', AppState.timestampEnabled);
+            updateEmbedPreview();
+        }
+
+        function updateEmbedPreview() {
+            const title = document.getElementById('embedTitle').value || 'Title will appear here';
+            const description = document.getElementById('embedDescription').value || 'Description will appear here';
+            const color = document.getElementById('embedColor').value;
+            const footer = document.getElementById('embedFooter').value || '';
+
+            document.getElementById('previewTitle').textContent = title;
+            document.getElementById('previewDescription').textContent = description;
+            document.getElementById('previewFooter').textContent = footer || 'Footer';
+            document.querySelector('.embed-preview').style.borderLeftColor = color;
+
+            if (AppState.timestampEnabled) {
+                document.getElementById('previewTimestamp').textContent = new Date().toLocaleString();
+            } else {
+                document.getElementById('previewTimestamp').textContent = '';
+            }
+        }
+
+        function syncColorPicker() {
+            const value = document.getElementById('embedColorValue').value;
+            if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+                document.getElementById('embedColor').value = value;
+                updateEmbedPreview();
+            }
+        }
+
+        /* ============================================
+           Message History
+        ============================================ */
+        function addToHistory(status, message, webhookName, error = null) {
+            const entry = {
+                id: Date.now().toString(),
+                status,
+                message: message.substring(0, 100) + (message.length > 100 ? '...' : ''),
+                webhookName,
+                error,
+                timestamp: new Date().toISOString()
+            };
+
+            AppState.messageHistory.unshift(entry);
+            
+            // Keep only last 50 entries
+            if (AppState.messageHistory.length > 50) {
+                AppState.messageHistory = AppState.messageHistory.slice(0, 50);
+            }
+
+            saveHistory();
+            renderMessageHistory();
+        }
+
+        function clearHistory() {
+            AppState.messageHistory = [];
+            saveHistory();
+            renderMessageHistory();
+            showToast('success', 'Cleared', 'Message history cleared');
+        }
+
+        function renderMessageHistory() {
+            const container = DOM.messageLog;
+
+            if (AppState.messageHistory.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <svg viewBox="0 0 24 24"><path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/></svg>
+                        <h3>No History Yet</h3>
+                        <p>Your sent messages will appear here</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = AppState.messageHistory.map(entry => `
+                <div class="log-entry">
+                    <div class="log-status ${entry.status}"></div>
+                    <div class="log-content">
+                        <div class="log-message">${escapeHtml(entry.message)}</div>
+                        <div class="log-webhook">via ${escapeHtml(entry.webhookName)}</div>
+                        ${entry.error ? `<div class="log-message" style="color: var(--accent-danger); font-size: 11px;">${escapeHtml(entry.error)}</div>` : ''}
+                        <div class="log-time">${formatTime(entry.timestamp)}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        /* ============================================
+           Navigation
+        ============================================ */
+        function navigateTo(page, element) {
+            AppState.currentPage = page;
+
+            // Update nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('active');
+            });
+            element.classList.add('active');
+
+            // Update page views
+            document.querySelectorAll('.page-view').forEach(view => {
+                view.classList.remove('active');
+            });
+            document.getElementById(`${page}Page`).classList.add('active');
+
+            // Update page title
+            const titles = {
+                webhooks: { title: 'Webhook Manager', subtitle: 'Manage your Discord webhooks' },
+                sender: { title: 'Send Message', subtitle: 'Compose and send messages to Discord' },
+                history: { title: 'Message History', subtitle: 'View your sent messages' }
+            };
+
+            document.getElementById('pageTitle').textContent = titles[page].title;
+            document.getElementById('pageSubtitle').textContent = titles[page].subtitle;
+
+            // Close mobile menu if open
+            closeMobileMenu();
+        }
+
+        /* ============================================
+           Sidebar Functions
+        ============================================ */
+        function toggleSidebar() {
+            AppState.sidebarCollapsed = !AppState.sidebarCollapsed;
+            DOM.sidebar.classList.toggle('collapsed', AppState.sidebarCollapsed);
+        }
+
+        function openMobileMenu() {
+            DOM.sidebar.classList.add('mobile-open');
+            DOM.mobileOverlay.classList.add('active');
+        }
+
+        function closeMobileMenu() {
+            DOM.sidebar.classList.remove('mobile-open');
+            DOM.mobileOverlay.classList.remove('active');
+        }
+
+        /* ============================================
+           Theme Functions
+        ============================================ */
+        function toggleTheme() {
+            AppState.darkMode = !AppState.darkMode;
+            document.body.classList.toggle('light-mode', !AppState.darkMode);
+            saveTheme();
+        }
+
+        /* ============================================
+           Toast Notifications
+        ============================================ */
+        function showToast(type, title, message) {
+            const icons = {
+                success: '<svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>',
+                error: '<svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>',
+                warning: '<svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>',
+                info: '<svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>'
+            };
+
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `
+                <div class="toast-icon">${icons[type]}</div>
+                <div class="toast-content">
+                    <div class="toast-title">${escapeHtml(title)}</div>
+                    <div class="toast-message">${escapeHtml(message)}</div>
+                </div>
+                <div class="toast-close" onclick="removeToast(this.parentElement)">
+                    <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+                </div>
+            `;
+
+            DOM.toastContainer.appendChild(toast);
+
+            // Auto remove after 5 seconds
+            setTimeout(() => removeToast(toast), 5000);
+        }
+
+        function removeToast(toast) {
+            if (!toast || !toast.parentElement) return;
+            toast.classList.add('removing');
+            setTimeout(() => toast.remove(), 300);
+        }
+
+        /* ============================================
+           Ripple Effect
+        ============================================ */
+        function createRipple(event) {
+            const element = event.currentTarget;
+            const ripple = document.createElement('span');
+            const rect = element.getBoundingClientRect();
+            
+            const size = Math.max(rect.width, rect.height);
+            const x = event.clientX - rect.left - size / 2;
+            const y = event.clientY - rect.top - size / 2;
+
+            ripple.style.width = ripple.style.height = `${size}px`;
+            ripple.style.left = `${x}px`;
+            ripple.style.top = `${y}px`;
+            ripple.className = 'ripple';
+
+            element.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 600);
+        }
+
+        /* ============================================
+           Utility Functions
+        ============================================ */
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatTime(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleString();
+        }
+
+        /* ============================================
+           Initialize App
+        ============================================ */
+        init();
+    </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9ce3d7b9107c9ba3',t:'MTc3MTE0ODQxNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
